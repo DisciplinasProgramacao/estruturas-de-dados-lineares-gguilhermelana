@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 
 public class App {
@@ -23,6 +24,9 @@ public class App {
 
     /** Fila de pedidos (FIFO - First In, First Out) */
     static Fila<Pedido> filaPedidos = new Fila<>();
+
+    /** Lista de pedidos */
+    static Lista<Pedido> listaPedidos = new Lista<>();
 
     static void limparTela() {
         System.out.print("\033[H\033[2J");
@@ -71,6 +75,8 @@ public class App {
         System.out.println("7 - Exibir valor total médio dos N primeiros pedidos");
         System.out.println("8 - Exibir primeiros pedidos com valor acima de X");
         System.out.println("9 - Exibir primeiros pedidos que contêm um produto");
+        System.out.println("10 - Exibir o faturamento do comércio de produtos");
+        System.out.println("11 - Exibir a quantidade de pedidos realizados em um determinado período");
         System.out.println("0 - Sair");
         System.out.print("Digite sua opção: ");
         return Integer.parseInt(teclado.nextLine());
@@ -124,13 +130,18 @@ public class App {
      * Em caso de não encontrar o produto, retorna null
      */
     static Produto localizarProduto() {
-
         Produto produto = null;
-        Boolean localizado = false;
+        boolean localizado = false; 
 
         cabecalho();
         System.out.println("Localizando um produto...");
-        int idProduto = lerOpcao("Digite o código identificador do produto desejado: ", Integer.class);
+        Integer idProduto = lerOpcao("Digite o código identificador do produto desejado: ", Integer.class);
+        
+        if (idProduto == null) {
+            System.out.println("Código inválido!");
+            return null;
+        }
+        
         for (int i = 0; (i < quantosProdutos && !localizado); i++) {
             if (produtosCadastrados[i].hashCode() == idProduto) {
                 produto = produtosCadastrados[i];
@@ -199,17 +210,27 @@ public class App {
      * @return O novo pedido
      */
     public static Pedido iniciarPedido() {
-
-        int formaPagamento = lerOpcao(
+        Integer formaPagamento = lerOpcao(
                 "Digite a forma de pagamento do pedido, sendo 1 para pagamento à vista e 2 para pagamento a prazo",
                 Integer.class);
+        
+        if (formaPagamento == null) {
+            System.out.println("Forma de pagamento inválida!");
+            return null;
+        }
+        
         Pedido pedido = new Pedido(LocalDate.now(), formaPagamento);
         Produto produto;
-        int numProdutos;
-
+        Integer numProdutos = lerOpcao("Quantos produtos serão incluídos no pedido?", Integer.class);
+        
+        if (numProdutos == null || numProdutos <= 0) {
+            System.out.println("Quantidade inválida!");
+            return null;
+        }
+        
         listarTodosOsProdutos();
         System.out.println("Incluindo produtos no pedido...");
-        numProdutos = lerOpcao("Quantos produtos serão incluídos no pedido?", Integer.class);
+        
         for (int i = 0; i < numProdutos; i++) {
             produto = localizarProdutoDescricao();
             if (produto == null) {
@@ -224,7 +245,7 @@ public class App {
     }
 
     /**
-     * Finaliza um pedido, momento no qual ele deve ser armazenado em uma fila de
+     * Finaliza um pedido, momento no qual ele deve ser armazenado em uma lista de
      * pedidos.
      * 
      * @param pedido O pedido que deve ser finalizado.
@@ -232,7 +253,7 @@ public class App {
     public static void finalizarPedido(Pedido pedido) {
 
         if (pedido != null) {
-            filaPedidos.enfileirar(pedido);
+            listaPedidos.adicionar(pedido);
             System.out.println("Pedido finalizado com sucesso!");
             System.out.println(pedido);
         } else {
@@ -244,53 +265,49 @@ public class App {
      * Lista os produtos dos primeiros pedidos da fila.
      */
     public static void listarProdutosPrimerosPedidos() {
-
         cabecalho();
 
-        if (filaPedidos.vazia()) {
+        if (listaPedidos.vazia()) {
             System.out.println("Não há pedidos cadastrados!");
             return;
         }
 
-        int numPedidos = lerOpcao("Quantos primeiros pedidos deseja visualizar?", Integer.class);
+        Integer numPedidos = lerOpcao("Quantos primeiros pedidos deseja visualizar?", Integer.class);
 
-        if (numPedidos <= 0) {
+        if (numPedidos == null || numPedidos <= 0) {
             System.out.println("Número inválido de pedidos!");
             return;
         }
 
-        try {
-            // Usa o método filtrar para obter os primeiros N pedidos (todos passam no
-            // teste)
-            Fila<Pedido> primeirosPedidos = filaPedidos.filtrar(pedido -> true, numPedidos);
+        if (numPedidos > listaPedidos.tamanho()) {
+            System.out.println("Há menos pedidos cadastrados do que o número solicitado!");
+            return;
+        }
 
+        try {
             System.out.println("\n=== PRODUTOS DOS PRIMEIROS PEDIDOS ===\n");
 
-            int contadorPedidos = 1;
-            while (!primeirosPedidos.vazia()) {
-                Pedido pedido = primeirosPedidos.desenfileirar();
+            for (int contadorPedidos = 0; contadorPedidos < numPedidos; contadorPedidos++) {
+                Pedido pedido = listaPedidos.obterElemento(contadorPedidos);
 
-                System.out.println("--- Pedido #" + contadorPedidos + " ---");
+                System.out.println("--- Pedido #" + (contadorPedidos + 1) + " ---");
                 System.out.println("Número do pedido: " + String.format("%02d", pedido.getIdPedido()));
                 System.out.println("Data do pedido: " + pedido.getDataPedido());
                 System.out.println("Quantidade de produtos: " + pedido.getQuantosProdutos());
                 System.out.println("\nProdutos:");
 
-                Produto[] produtos = pedido.getProdutos();
+                Lista<Produto> produtos = pedido.getProdutos();
                 for (int i = 0; i < pedido.getQuantosProdutos(); i++) {
-                    System.out.println("  " + (i + 1) + ". " + produtos[i].descricao +
-                            " - R$ " + String.format("%.2f", produtos[i].valorDeVenda()));
+                    System.out.println("  " + (i + 1) + ". " + produtos.obterElemento(i).descricao +
+                            " - R$ " + String.format("%.2f", produtos.obterElemento(i).valorDeVenda()));
                 }
 
                 System.out.println("Valor total do pedido: R$ " + String.format("%.2f", pedido.valorFinal()));
                 System.out.println();
-
-                contadorPedidos++;
             }
 
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalStateException | IndexOutOfBoundsException e) {
             System.out.println("Erro: " + e.getMessage());
-            System.out.println("Há menos pedidos cadastrados do que o número solicitado!");
         }
     }
 
@@ -305,9 +322,9 @@ public class App {
             return;
         }
 
-        int numPedidos = lerOpcao("Quantos primeiros pedidos deseja considerar no cálculo?", Integer.class);
+        Integer numPedidos = lerOpcao("Quantos primeiros pedidos deseja considerar no cálculo?", Integer.class);
 
-        if (numPedidos <= 0) {
+        if (numPedidos == null || numPedidos <= 0) {
             System.out.println("Número inválido de pedidos!");
             return;
         }
@@ -337,9 +354,9 @@ public class App {
             return;
         }
 
-        int numPedidos = lerOpcao("Quantos primeiros pedidos deseja analisar?", Integer.class);
+        Integer numPedidos = lerOpcao("Quantos primeiros pedidos deseja analisar?", Integer.class);
 
-        if (numPedidos <= 0) {
+        if (numPedidos == null || numPedidos <= 0) {
             System.out.println("Número inválido de pedidos!");
             return;
         }
@@ -396,9 +413,9 @@ public class App {
             return;
         }
 
-        int numPedidos = lerOpcao("Quantos primeiros pedidos deseja analisar?", Integer.class);
+        Integer numPedidos = lerOpcao("Quantos primeiros pedidos deseja analisar?", Integer.class);
 
-        if (numPedidos <= 0) {
+        if (numPedidos == null || numPedidos <= 0) {
             System.out.println("Número inválido de pedidos!");
             return;
         }
@@ -415,9 +432,9 @@ public class App {
             // buscado
             Fila<Pedido> pedidosFiltrados = filaPedidos.filtrar(
                     pedido -> {
-                        Produto[] produtos = pedido.getProdutos();
+                        Lista<Produto> produtos = pedido.getProdutos();
                         for (int i = 0; i < pedido.getQuantosProdutos(); i++) {
-                            if (produtos[i].equals(produtoBuscado)) {
+                            if (produtos.obterElemento(i).equals(produtoBuscado)) {
                                 return true;
                             }
                         }
@@ -451,6 +468,37 @@ public class App {
         }
     }
 
+    /**
+     * Exibe o faturamento total do comércio de produtos.
+     */
+    public static void obterFaturamento() {
+        cabecalho();
+        double faturamento = listaPedidos.obterSoma(Pedido::valorFinal);
+        System.out.println("Faturamento do comércio de produtos: R$ " + String.format("%.2f", faturamento));
+    }
+
+    /**
+     * Conta a quantidade de pedidos realizados em um determinado período.
+     */
+    public static void contarPedidosPorData() {
+        cabecalho();
+        
+        try {
+            System.out.println("Informe a data inicial dos pedidos (dd/MM/yyyy):");
+            LocalDate dataInicial = LocalDate.parse(teclado.nextLine(), DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            System.out.println("Informe a data final dos pedidos (dd/MM/yyyy):");
+            LocalDate dataFinal = LocalDate.parse(teclado.nextLine(), DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+            int quantidade = listaPedidos.contar(pedido -> 
+                pedido.getDataPedido().isAfter(dataInicial) && pedido.getDataPedido().isBefore(dataFinal)
+            );
+
+            System.out.println("Quantidade de pedidos realizados entre as datas informadas: " + quantidade);
+        } catch (Exception e) {
+            System.out.println("Erro ao processar as datas: formato inválido!");
+        }
+    }
+
     public static void main(String[] args) {
 
         teclado = new Scanner(System.in, Charset.forName("UTF-8"));
@@ -474,6 +522,8 @@ public class App {
                 case 7 -> exibirValorMedioPrimerosPedidos();
                 case 8 -> exibirPedidosAcimaDeValor();
                 case 9 -> exibirPedidosComProduto();
+                case 10 -> obterFaturamento();
+                case 11 -> contarPedidosPorData();
             }
             pausa();
         } while (opcao != 0);
