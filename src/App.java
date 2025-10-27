@@ -151,22 +151,22 @@ public class App {
      *         localizado no vetor de produtos cadastrados.
      */
     static Produto localizarProdutoDescricao() {
-
         Produto produto = null;
-        Boolean localizado = false;
+        boolean localizado = false;
         String descricao;
-
+    
         cabecalho();
         System.out.println("Localizando um produto...");
         System.out.println("Digite o nome ou a descrição do produto desejado:");
         descricao = teclado.nextLine();
+    
         for (int i = 0; (i < quantosProdutos && !localizado); i++) {
-            if (produtosCadastrados[i].descricao.equals(descricao)) {
+            if (produtosCadastrados[i].descricao.equalsIgnoreCase(descricao)) {
                 produto = produtosCadastrados[i];
                 localizado = true;
             }
         }
-
+    
         return produto;
     }
 
@@ -455,7 +455,7 @@ public class App {
 
         teclado = new Scanner(System.in, Charset.forName("UTF-8"));
 
-        nomeArquivoDados = "produtos.txt";
+        nomeArquivoDados = "C://users//1446843//Documents//estruturas-de-dados-lineares-gguilhermelana//src//produtos.txt";
         produtosCadastrados = lerProdutos(nomeArquivoDados);
 
         Pedido pedido = null;
